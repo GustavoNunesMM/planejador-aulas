@@ -1,233 +1,222 @@
 <template>
     <div class="container mx-auto p-4">
-        <h1 class="text-2xl font-bold mb-4">Planejador de Aulas</h1>
-        <div class="mb-6 p-4 bg-gray-50 rounded-lg">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="col-span-2">
-                    <input v-model="newEntry.date" type="date" class="p-2 border rounded w-full">
-                    <small class="text-gray-500">
-                        Dia da semana: {{ selectedWeekDay }}
-                    </small>
-                </div>
-
-                <input v-model="newEntry.activity" placeholder="Nome da aula" class="p-2 border rounded">
-
-                <textarea v-model="newEntry.materials" placeholder="Materiais" class="p-2 border rounded"></textarea>
-            </div>
-
-            <div class="mt-4 flex gap-2 flex-wrap">
-                <button @click="addEntry" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                    Adicionar Aula
-                </button>
-
-                <label class="flex items-center gap-2">
-                    <input type="checkbox" v-model="newEntry.isAssessment">
-                    É avaliação?
-                </label>
+        <!-- Cabeçalho com informações do professor -->
+        <div class="mb-6 bg-gray-50 p-4 rounded-lg">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input v-model="professor" placeholder="Nome do Professor" class="p-2 border rounded">
+                <input v-model="conteudoGeral" placeholder="Conteúdo Principal" class="p-2 border rounded">
             </div>
         </div>
 
-        <!-- Lista de aulas -->
-        <div class="mb-8">
-            <div v-for="(entry, index) in sortedEntries" :key="index" class="mb-2 p-4 border rounded bg-white">
-                <div v-if="editingIndex !== index" class="flex justify-between items-start">
-                    <div>
-                        <span class="font-bold" :class="{ 'text-red-600': entry.isAssessment }">
-                            {{ formatDate(entry.date) }} ({{ getWeekDay(entry.date) }})
-                        </span>
-                        - {{ entry.activity }}
-                        <p v-if="entry.materials" class="text-sm text-gray-600 mt-1">
-                            📦 Materiais: {{ entry.materials }}
-                        </p>
-                    </div>
-                    <div class="flex gap-2">
-                        <button @click="startEdit(index)" class="text-yellow-600 hover:text-yellow-700">
-                            ✎
-                        </button>
-                        <button @click="removeEntry(index)" class="text-red-500 hover:text-red-700">
-                            ✕
-                        </button>
-                    </div>
-                </div>
+        <!-- Seletor de calendário e configuração de aulas -->
+        <div class="mb-6 bg-gray-50 p-4 rounded-lg">
+            <DatePicker v-model="selectedDate" inline :enable-time-picker="false" />
 
-                <!-- Modo edição -->
-                <div v-else class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <input v-model="editBuffer.date" type="date" class="p-2 border rounded">
-                    <input v-model="editBuffer.activity" class="p-2 border rounded">
-                    <textarea v-model="editBuffer.materials" class="p-2 border rounded"></textarea>
-                    <div class="flex gap-2 items-center">
-                        <button @click="saveEdit(index)" class="bg-green-500 text-white px-3 py-1 rounded">
-                            ✓
-                        </button>
-                        <button @click="cancelEdit" class="bg-gray-500 text-white px-3 py-1 rounded">
-                            ✕
-                        </button>
-                        <label class="flex items-center gap-1 text-sm">
-                            <input type="checkbox" v-model="editBuffer.isAssessment">
-                            Avaliação
-                        </label>
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input v-model="aulasPorDia" type="number" placeholder="Aulas por dia" class="p-2 border rounded">
+                <select v-model="diaSemana" class="p-2 border rounded">
+                    <option v-for="dia in diasDaSemana" :key="dia">{{ dia }}</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Formulário de aulas -->
+        <div class="mb-6 bg-gray-50 p-4 rounded-lg">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <input v-model="novaAula.data" type="date" class="p-2 border rounded">
+                <input v-model="novaAula.titulo" placeholder="Título da Aula" class="p-2 border rounded">
+                <textarea v-model="novaAula.conteudo" placeholder="Conteúdo Detalhado"
+                    class="p-2 border rounded"></textarea>
+
+                <!-- Upload de materiais -->
+                <div class="space-y-2">
+                    <input type="file" @change="handleImageUpload" accept="image/*" class="w-full">
+                    <input v-model="novoLink" placeholder="Link externo" class="p-2 border rounded">
+                    <button @click="addMaterial" class="bg-blue-500 text-white px-2 py-1 rounded">
+                        Adicionar Material
+                    </button>
+                </div>
+            </div>
+
+            <button @click="addAula" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                Adicionar Aula
+            </button>
+        </div>
+
+        <!-- Listagem de aulas -->
+        <div class="mb-8 space-y-4">
+            <div v-for="(aula, index) in aulas" :key="index" class="bg-white p-4 rounded-lg shadow">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-bold">{{ aula.titulo }}</h3>
+                        <p class="text-sm text-gray-600">{{ formatDate(aula.data) }}</p>
+                        <p class="mt-2">{{ aula.conteudo }}</p>
+                        <div class="mt-2 space-y-1">
+                            <div v-for="(material, mIndex) in aula.materiais" :key="mIndex">
+                                <a v-if="material.tipo === 'link'" :href="material.conteudo" target="_blank"
+                                    class="text-blue-500">
+                                    {{ material.conteudo }}
+                                </a>
+                                <img v-else :src="material.conteudo" class="max-w-[200px] mt-2">
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Exportação -->
-        <div class="p-4 bg-gray-100 rounded-lg space-y-4">
+        <div class="bg-gray-100 p-4 rounded-lg space-y-4">
             <div class="flex gap-4 flex-wrap">
-                <button @click="generateReport" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
-                    Gerar Relatório Texto
-                </button>
-
-                <button @click="generatePDF" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+                <button @click="generatePDF" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
                     Exportar PDF
                 </button>
+                <button @click="exportToExcel" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+                    Exportar Excel
+                </button>
             </div>
-
-            <pre v-if="reportContent" class="bg-white p-4 rounded">{{ reportContent }}</pre>
         </div>
     </div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from 'vue';
+import DatePicker from 'vue-datepicker-next';
 import jsPDF from 'jspdf';
+import { utils, writeFile } from 'xlsx';
+import 'vue-datepicker-next/index.css'; // Importe o CSS
 
-interface ClassEntry {
-    date: string;
-    activity: string;
-    materials: string;
-    isAssessment: boolean;
+interface Aula {
+    data: string;
+    titulo: string;
+    conteudo: string;
+    materiais: Material[];
+}
+
+interface Material {
+    tipo: 'imagem' | 'link';
+    conteudo: string;
 }
 
 export default defineComponent({
+    components: { DatePicker },
     data() {
         return {
-            newEntry: {
-                date: '',
-                activity: '',
-                materials: '',
-                isAssessment: false
-            } as ClassEntry,
-            entries: [] as ClassEntry[],
-            reportContent: '',
-            editingIndex: -1,
-            editBuffer: {} as ClassEntry,
-            weekDayPattern: null as number | null
+            professor: '',
+            conteudoGeral: '',
+            selectedDate: new Date(),
+            aulasPorDia: 1,
+            diaSemana: 'Segunda',
+            diasDaSemana: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'],
+            novaAula: {
+                data: '',
+                titulo: '',
+                conteudo: '',
+                materiais: []
+            } as Aula,
+            novoLink: '',
+            aulas: [] as Aula[],
+            ultimaData: null as Date | null
         };
     },
 
-    computed: {
-        sortedEntries(): ClassEntry[] {
-            return [...this.entries].sort((a, b) =>
-                new Date(a.date).getTime() - new Date(b.date).getTime()
-            );
-        },
-
-        selectedWeekDay(): string {
-            return this.newEntry.date
-                ? this.getWeekDay(this.newEntry.date)
-                : '';
-        }
-    },
-
-    watch: {
-        'newEntry.date'(newDate) {
-            if (newDate) {
-                this.weekDayPattern = new Date(newDate).getDay();
-            }
-        }
-    },
-
     methods: {
-        addEntry() {
-            if (this.newEntry.date && this.newEntry.activity) {
-                this.entries.push({ ...this.newEntry });
+        calculateNextDate() {
+            if (!this.ultimaData) return new Date();
+            const nextDate = new Date(this.ultimaData);
+            nextDate.setDate(nextDate.getDate() + 7);
+            return nextDate;
+        },
 
-                // Configura próxima data automaticamente
-                if (this.weekDayPattern !== null) {
-                    const lastDate = new Date(this.newEntry.date);
-                    const nextDate = new Date(lastDate);
-                    nextDate.setDate(lastDate.getDate() + 7);
-                    this.newEntry.date = nextDate.toISOString().split('T')[0];
-                }
-
-                this.newEntry.activity = '';
-                this.newEntry.materials = '';
+        handleImageUpload(event: Event) {
+            const input = event.target as HTMLInputElement;
+            if (input.files?.[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    if (e.target?.result) {
+                        this.novaAula.materiais.push({
+                            tipo: 'imagem',
+                            conteudo: e.target.result as string
+                        });
+                    }
+                };
+                reader.readAsDataURL(input.files[0]);
             }
         },
 
-        startEdit(index: number) {
-            this.editingIndex = index;
-            this.editBuffer = { ...this.entries[index] };
-        },
-
-        saveEdit(index: number) {
-            this.entries.splice(index, 1, this.editBuffer);
-            this.cancelEdit();
-        },
-
-        cancelEdit() {
-            this.editingIndex = -1;
-            this.editBuffer = {} as ClassEntry;
-        },
-
-        removeEntry(index: number) {
-            this.entries.splice(index, 1);
-        },
-
-        getWeekDay(dateString: string): string {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('pt-BR', { weekday: 'long' });
-        },
-
-        formatDate(dateString: string): string {
-            return new Date(dateString).toLocaleDateString('pt-BR');
-        },
-
-        generateReport() {
-            const groupedEntries: { [key: string]: ClassEntry[] } = this.sortedEntries.reduce((acc, entry) => {
-            const date = this.formatDate(entry.date);
-            if (!acc[date]) acc[date] = [];
-                acc[date].push(entry);
-                return acc;
-            }, {} as { [key: string]: ClassEntry[] });
-
-            let report = 'PLANO ANUAL\n\n';
-            for (const [date, entries] of Object.entries(groupedEntries)) {
-                report += `  ${date.padEnd(20, ' ')}${entries[0].isAssessment ? '**' : ''}${entries[0].activity}${entries[0].isAssessment ? '**' : ''}\n`;
-                for (const entry of entries.slice(1)) {
-                report += `  ${''.padEnd(20, ' ')}${entry.isAssessment ? '**' : ''}${entry.activity}${entry.isAssessment ? '**' : ''}\n`;
-                if (entry.materials) {
-                    report += `  ${''.padEnd(20, ' ')}  Materiais: ${entry.materials}\n`;
-                }
-                }
-                report += '\n';
+        addMaterial() {
+            if (this.novoLink) {
+                this.novaAula.materiais.push({
+                    tipo: 'link',
+                    conteudo: this.novoLink
+                });
+                this.novoLink = '';
             }
-            this.reportContent = report;
-            
         },
 
-        generatePDF() {
+        addAula() {
+            if (!this.novaAula.data) {
+                const nextDate = this.calculateNextDate();
+                this.novaAula.data = nextDate.toISOString().split('T')[0];
+            }
+
+            this.aulas.push({ ...this.novaAula });
+            this.ultimaData = new Date(this.novaAula.data);
+
+            // Reset form
+            this.novaAula = {
+                data: '',
+                titulo: '',
+                conteudo: '',
+                materiais: []
+            };
+        },
+
+        formatDate(date: string) {
+            return new Date(date).toLocaleDateString('pt-BR');
+        },
+
+        async generatePDF() {
             const doc = new jsPDF();
             let yPos = 20;
 
+            // Cabeçalho
             doc.setFontSize(18);
-            doc.text("Plano Anual de Aulas", 14, 15);
+            doc.text(`Professor: ${this.professor}`, 14, yPos);
+            yPos += 10;
+            doc.text(`Conteúdo: ${this.conteudoGeral}`, 14, yPos);
+            yPos += 15;
 
+            // Conteúdo das aulas
             doc.setFontSize(12);
-            this.sortedEntries.forEach(entry => {
-                const date = this.formatDate(entry.date);
-                const text = `${date} (${this.getWeekDay(entry.date)}) - ${entry.activity}${entry.isAssessment ? ' **AVALIAÇÃO**' : ''}`;
-
-                doc.text(text, 14, yPos);
+            this.aulas.forEach(aula => {
+                doc.text(`Data: ${this.formatDate(aula.data)} - ${aula.titulo}`, 14, yPos);
                 yPos += 10;
 
-                if (entry.materials) {
-                    doc.setFontSize(10);
-                    doc.text(`   Materiais: ${entry.materials}`, 16, yPos);
+                // Conteúdo
+                const splitText = doc.splitTextToSize(aula.conteudo, 180);
+                splitText.forEach((line: string) => {
+                    doc.text(line, 16, yPos);
                     yPos += 7;
-                    doc.setFontSize(12);
-                }
+                });
+
+                // Materiais
+                aula.materiais.forEach( async (material) => {
+                    if (material.tipo === 'imagem') {
+                        const img = new Image();
+                        img.src = material.conteudo;
+                        await new Promise(resolve => {
+                            img.onload = () => {
+                                doc.addImage(img, 'JPEG', 16, yPos, 50, 50);
+                                yPos += 55;
+                                resolve(true);
+                            };
+                        });
+                    } else {
+                        doc.textWithLink(`Link: ${material.conteudo}`, 16, yPos, { url: material.conteudo });
+                        yPos += 10;
+                    }
+                });
 
                 if (yPos > 280) {
                     doc.addPage();
@@ -235,8 +224,28 @@ export default defineComponent({
                 }
             });
 
-            doc.save('plano-aulas.pdf');
+            doc.save(`${this.professor}-${this.conteudoGeral}.pdf`);
+        },
+
+        exportToExcel() {
+            const worksheet = utils.json_to_sheet(this.aulas.map(aula => ({
+                Data: this.formatDate(aula.data),
+                Título: aula.titulo,
+                Conteúdo: aula.conteudo,
+                Materiais: aula.materiais.map(m => m.tipo === 'link' ? m.conteudo : '[Imagem]').join(', ')
+            })));
+
+            const workbook = utils.book_new();
+            utils.book_append_sheet(workbook, worksheet, 'Aulas');
+            writeFile(workbook, `${this.professor}-aulas.xlsx`);
         }
     }
 });
 </script>
+
+<style>
+
+.max-w-\[200px\] {
+    max-width: 200px;
+}
+</style>
