@@ -11,6 +11,7 @@
   "dependencies": {
     "@types/jspdf": "^2.0.0",
     "@types/xlsx": "^0.0.36",
+    "docx": "^9.1.1",
     "file-saver": "^2.0.5",
     "jspdf": "^2.5.2",
     "vue": "^3.5.13",
