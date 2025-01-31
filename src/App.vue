@@ -1,77 +1,120 @@
 <template>
-    <div class="container mx-auto p-4">
-        <!-- Cabeçalho com informações do professor -->
-        <div class="mb-6 bg-gray-50 p-4 rounded-lg">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input v-model="professor" placeholder="Nome do Professor" class="p-2 border rounded">
-                <input v-model="conteudoGeral" placeholder="Conteúdo Principal" class="p-2 border rounded">
+    <div class="container mx-auto p-4 max-w-4xl">
+        <!-- Cabeçalho Compacto -->
+        <div class="mb-4 bg-white p-4 rounded-xl shadow-md">
+            <div class="flex flex-col md:flex-row gap-4">
+                <input v-model="professor" placeholder="Professor" class="p-2 border rounded-lg flex-1">
+                <input v-model="conteudoGeral" placeholder="Conteúdo" class="p-2 border rounded-lg flex-1">
             </div>
         </div>
 
-        <!-- Seletor de calendário e configuração de aulas -->
-        <div class="mb-6 bg-gray-50 p-4 rounded-lg">
-            <DatePicker v-model="selectedDate" inline :enable-time-picker="false" />
-
-            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input v-model="aulasPorDia" type="number" placeholder="Aulas por dia" class="p-2 border rounded">
-                <select v-model="diaSemana" class="p-2 border rounded">
-                    <option v-for="dia in diasDaSemana" :key="dia">{{ dia }}</option>
-                </select>
+        <!-- Configuração de Dias (Collapsible) -->
+        <div class="mb-4 bg-white p-4 rounded-xl shadow-md">
+            <div class="flex items-center gap-2 mb-2 cursor-pointer" @click="showConfig = !showConfig">
+                <span class="font-medium">▼ Configurar Dias/Aulas</span>
             </div>
-        </div>
 
-        <!-- Formulário de aulas -->
-        <div class="mb-6 bg-gray-50 p-4 rounded-lg">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <input v-model="novaAula.data" type="date" class="p-2 border rounded">
-                <input v-model="novaAula.titulo" placeholder="Título da Aula" class="p-2 border rounded">
-                <textarea v-model="novaAula.conteudo" placeholder="Conteúdo Detalhado"
-                    class="p-2 border rounded"></textarea>
-
-                <!-- Upload de materiais -->
-                <div class="space-y-2">
-                    <input type="file" @change="handleImageUpload" accept="image/*" class="w-full">
-                    <input v-model="novoLink" placeholder="Link externo" class="p-2 border rounded">
-                    <button @click="addMaterial" class="bg-blue-500 text-white px-2 py-1 rounded">
-                        Adicionar Material
+            <div v-if="showConfig" class="space-y-3">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+                    <select v-model="novoDia.dia" class="p-2 border rounded-lg">
+                        <option v-for="dia in diasDisponiveis" :key="dia" :value="dia">{{ dia }}</option>
+                    </select>
+                    <input v-model.number="novoDia.quantidade" type="number" placeholder="Aulas/dia"
+                        class="p-2 border rounded-lg">
+                    <button @click="adicionarDia" class="bg-blue-100 text-blue-600 p-2 rounded-lg">
+                        + Adicionar
                     </button>
                 </div>
-            </div>
 
-            <button @click="addAula" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                Adicionar Aula
-            </button>
-        </div>
-
-        <!-- Listagem de aulas -->
-        <div class="mb-8 space-y-4">
-            <div v-for="(aula, index) in aulas" :key="index" class="bg-white p-4 rounded-lg shadow">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h3 class="font-bold">{{ aula.titulo }}</h3>
-                        <p class="text-sm text-gray-600">{{ formatDate(aula.data) }}</p>
-                        <p class="mt-2">{{ aula.conteudo }}</p>
-                        <div class="mt-2 space-y-1">
-                            <div v-for="(material, mIndex) in aula.materiais" :key="mIndex">
-                                <a v-if="material.tipo === 'link'" :href="material.conteudo" target="_blank"
-                                    class="text-blue-500">
-                                    {{ material.conteudo }}
-                                </a>
-                                <img v-else :src="material.conteudo" class="max-w-[200px] mt-2">
-                            </div>
-                        </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div v-for="(dia, index) in diasConfigurados" :key="index"
+                        class="bg-gray-50 p-2 rounded flex justify-between items-center">
+                        <span class="text-sm">{{ dia.dia }} - quantidade de aulas: {{ dia.quantidade }}</span>
+                        <button @click="removerDia(index)" class="text-red-400 hover:text-red-600">×</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Exportação -->
-        <div class="bg-gray-100 p-4 rounded-lg space-y-4">
+        <!-- Adicionar Aula Compacto -->
+        <div class="mb-4 bg-white p-4 rounded-xl shadow-md">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+                <div class="relative">
+                    <date-picker
+                    v-model="novaAula.data"
+                    :min-date="new Date()"
+                    model-type="date"
+                    :disabled-dates="disableDate"
+                    inputFormat="dd/MM/yyyy"
+                    class="w-full border rounded-md p-2"
+                    input-class="rounded-lg w-full"
+                    prevent-disable-date-selection="true"
+                />
+
+                </div>
+                <input v-model="novaAula.titulo" placeholder="Título da aula" class="p-2 border rounded-lg">
+
+                <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input type="file" @change="handleImageUpload" accept="image/*" class="hidden">
+                    <span class="text-blue-600">📎 Adicionar Imagem</span>
+                    <span v-if="imageAdded" class="text-green-500 text-sm">✓</span>
+                </label>
+            </div>
+
+            <textarea v-model="novaAula.conteudo" placeholder="Conteúdo detalhado"
+                class="w-full p-2 border rounded-lg mb-2 h-24"></textarea>
+
+            <button @click="adicionarAula" class="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700">
+                + Adicionar Aula
+            </button>
+        </div>
+
+        <!-- Lista de Aulas Compacta -->
+        <div class="space-y-2">
+            <div v-for="(aula, index) in aulas" :key="index" class="bg-white p-3 rounded-lg shadow-sm border group relative">
+                <!-- Botão de Edição -->
+                <button @click="iniciarEdicao(index)"
+                    class="absolute right-2 top-2 mr-6 opacity-0 group-hover:opacity-100 text-blue-500">
+                    ✎
+                </button>
+
+                <button @click="removerAula(index)"
+                    class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-blue-500">
+                    ❌
+                </button>
+
+                <!-- Modo Visualização -->
+                <div v-if="edicaoIndex !== index">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="font-medium text-sm">{{ aula.titulo }}</span>
+                        <span class="text-gray-500 text-xs">{{ formatDate(aula.data) }}</span>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-2">{{ aula.conteudo }}</p>
+                    <div class="flex gap-1 overflow-x-auto">
+                        <img v-for="(img, i) in aula.materiais" :key="i" :src="img"
+                            class="h-16 w-16 object-cover rounded border">
+                    </div>
+                </div>
+
+                <!-- Modo Edição -->
+                <div v-else class="space-y-2">
+                    <input v-model="edicaoBuffer.titulo" class="p-1 border rounded w-full text-sm">
+                    <textarea v-model="edicaoBuffer.conteudo" class="p-1 border rounded w-full text-sm h-16"></textarea>
+                    <div class="flex gap-1">
+                        <button @click="salvarEdicao(index)"
+                            class="text-sm bg-green-100 text-green-600 px-2 rounded">Salvar</button>
+                        <button @click="cancelarEdicao"
+                            class="text-sm bg-gray-100 text-gray-600 px-2 rounded">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-md">
             <div class="flex gap-4 flex-wrap">
-                <button @click="generatePDF" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                <button @click="gerarPDF" class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors">
                     Exportar PDF
                 </button>
-                <button @click="exportToExcel" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+                <button @click="exportarExcel" class="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors">
                     Exportar Excel
                 </button>
             </div>
@@ -81,102 +124,134 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue';
-import DatePicker from 'vue-datepicker-next';
+import DatePicker from 'vue3-datepicker';
 import jsPDF from 'jspdf';
-import { utils, writeFile } from 'xlsx';
-import 'vue-datepicker-next/index.css'; // Importe o CSS
+import { utils, writeFileXLSX } from 'xlsx';
+import 'vue-datepicker-next/index.css'; // Importa o CSS do datepicker
 
-interface Aula {
-    data: string;
-    titulo: string;
-    conteudo: string;
-    materiais: Material[];
+interface DiaConfigurado {
+    dia: string;
+    quantidade: number;
 }
 
-interface Material {
-    tipo: 'imagem' | 'link';
+interface Aula {
+    data: Date;
+    titulo: string;
     conteudo: string;
+    materiais: string[];
 }
 
 export default defineComponent({
     components: { DatePicker },
     data() {
         return {
+            date: new Date(),
             professor: '',
             conteudoGeral: '',
-            selectedDate: new Date(),
-            aulasPorDia: 1,
-            diaSemana: 'Segunda',
-            diasDaSemana: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'],
+            showConfig: false,
+            diasDisponiveis: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'],
+            disableDate: {
+                to: new Date(2025, 11, 31), // Highlight all dates up to specific date
+                from: new Date(2025, 0,1), // Highlight all dates after specific date
+                dates: [new Date(2025,1,16)] as any[],
+                includeDisabled: true // Highlight disabled dates
+            },
+            novoDia: { dia: 'Segunda', quantidade: 1 } as DiaConfigurado,
+            diasConfigurados: [] as DiaConfigurado[],
             novaAula: {
-                data: '',
+                data: new Date(),
                 titulo: '',
                 conteudo: '',
                 materiais: []
             } as Aula,
-            novoLink: '',
             aulas: [] as Aula[],
+            edicaoIndex: -1,
+            edicaoBuffer: {} as Aula,
+            imageAdded: false,
             ultimaData: null as Date | null
         };
     },
 
     methods: {
-        calculateNextDate() {
+        getDisabledDates() {
+            const year = new Date().getFullYear();
+            const disabledDates: Date[] = []; // Array de strings no formato 'YYYY-MM-DD'
+
+            // Para cada dia da semana configurado, gera as datas para o ano atual
+            this.diasConfigurados.forEach(el => {
+                let currentDate = new Date(year, 0, 1); // Início do ano
+                const dayOfWeek = currentDate.getDay(); // Obtém o dia da semana (0 = Domingo, 1 = Segunda, etc.)
+                const indexDia = this.diasDisponiveis.findIndex(element => element === el.dia);
+
+                // Ajuste para o primeiro dia correto
+                let daysToAdd = indexDia - dayOfWeek;
+                if (daysToAdd <= 0) daysToAdd += 7;
+
+                // Calcula as datas para cada semana do ano
+                while (currentDate.getFullYear() === year) {
+                    currentDate.setDate(currentDate.getDate() + daysToAdd);
+                    // Adiciona a data no formato 'YYYY-MM-DD'
+                    disabledDates.push(currentDate); 
+                    daysToAdd = 7; // Avança uma semana
+                }
+            });
+
+            // Atualiza a propriedade reativa de disableDate
+            this.disableDate.dates = disabledDates;
+        },
+
+        adicionarDia() {
+            const existente = this.diasConfigurados.find(d => d.dia === this.novoDia.dia);
+
+            if (existente) {
+                existente.quantidade = this.novoDia.quantidade; // Atualiza a quantidade se já existir
+            } else if (this.novoDia.quantidade > 0) {
+                this.diasConfigurados.push({ ...this.novoDia });
+                this.getDisabledDates(); // Atualiza as datas desabilitadas
+            }
+
+            this.novoDia = { dia: 'Segunda', quantidade: 1 }; // Resetando o input
+        },
+        removerDia(index: number) {
+            this.diasConfigurados.splice(index, 1);
+        },
+        calcularProximaData() {
             if (!this.ultimaData) return new Date();
-            const nextDate = new Date(this.ultimaData);
-            nextDate.setDate(nextDate.getDate() + 7);
-            return nextDate;
+            const novaData = new Date(this.ultimaData);
+            novaData.setDate(novaData.getDate() + 7);
+            return novaData;
         },
 
-        handleImageUpload(event: Event) {
-            const input = event.target as HTMLInputElement;
-            if (input.files?.[0]) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    if (e.target?.result) {
-                        this.novaAula.materiais.push({
-                            tipo: 'imagem',
-                            conteudo: e.target.result as string
-                        });
-                    }
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        },
+        adicionarAula() {
+            const aula = {
+                ...this.novaAula,
+                data: new Date(this.novaAula.data)
+            };
 
-        addMaterial() {
-            if (this.novoLink) {
-                this.novaAula.materiais.push({
-                    tipo: 'link',
-                    conteudo: this.novoLink
-                });
-                this.novoLink = '';
-            }
-        },
+            this.aulas.push(aula);
+            this.ultimaData = aula.data;
 
-        addAula() {
-            if (!this.novaAula.data) {
-                const nextDate = this.calculateNextDate();
-                this.novaAula.data = nextDate.toISOString().split('T')[0];
-            }
-
-            this.aulas.push({ ...this.novaAula });
-            this.ultimaData = new Date(this.novaAula.data);
-
-            // Reset form
+            // Resetar formulário
             this.novaAula = {
-                data: '',
+                data: this.calcularProximaData(),
                 titulo: '',
                 conteudo: '',
                 materiais: []
             };
         },
 
-        formatDate(date: string) {
-            return new Date(date).toLocaleDateString('pt-BR');
+        removerAula(index: number) {
+            this.aulas.splice(index, 1);
         },
 
-        async generatePDF() {
+        formatDate(date: Date) {
+            return date.toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        },
+        gerarPDF() {
             const doc = new jsPDF();
             let yPos = 20;
 
@@ -187,35 +262,28 @@ export default defineComponent({
             doc.text(`Conteúdo: ${this.conteudoGeral}`, 14, yPos);
             yPos += 15;
 
-            // Conteúdo das aulas
+            
+            // Aulas
             doc.setFontSize(12);
-            this.aulas.forEach(aula => {
-                doc.text(`Data: ${this.formatDate(aula.data)} - ${aula.titulo}`, 14, yPos);
+            this.aulas.forEach((aula, index) => {
+                doc.text(`${index + 1}. ${aula.titulo} (${this.formatDate(aula.data)})`, 14, yPos);
                 yPos += 10;
-
-                // Conteúdo
-                const splitText = doc.splitTextToSize(aula.conteudo, 180);
-                splitText.forEach((line: string) => {
+                
+                const splitContent = doc.splitTextToSize(aula.conteudo, 180);
+                splitContent.forEach((line: string) => {
                     doc.text(line, 16, yPos);
                     yPos += 7;
                 });
 
-                // Materiais
-                aula.materiais.forEach( async (material) => {
-                    if (material.tipo === 'imagem') {
-                        const img = new Image();
-                        img.src = material.conteudo;
-                        await new Promise(resolve => {
-                            img.onload = () => {
-                                doc.addImage(img, 'JPEG', 16, yPos, 50, 50);
-                                yPos += 55;
-                                resolve(true);
-                            };
-                        });
-                    } else {
-                        doc.textWithLink(`Link: ${material.conteudo}`, 16, yPos, { url: material.conteudo });
-                        yPos += 10;
-                    }
+                // Imagens
+                aula.materiais.forEach((imgSrc, imgIndex) => {
+                    if (imgIndex % 2 === 0 && imgIndex !== 0) yPos += 55;
+
+                    const img = new Image();
+                    img.src = imgSrc;
+                    doc.addImage(img, 'JPEG', imgIndex % 2 === 0 ? 16 : 106, yPos, 40, 30);
+
+                    if (imgIndex % 2 !== 0) yPos += 65;
                 });
 
                 if (yPos > 280) {
@@ -224,28 +292,83 @@ export default defineComponent({
                 }
             });
 
-            doc.save(`${this.professor}-${this.conteudoGeral}.pdf`);
+            doc.save(`${this.professor}_${this.conteudoGeral}.pdf`);
         },
 
-        exportToExcel() {
-            const worksheet = utils.json_to_sheet(this.aulas.map(aula => ({
-                Data: this.formatDate(aula.data),
-                Título: aula.titulo,
-                Conteúdo: aula.conteudo,
-                Materiais: aula.materiais.map(m => m.tipo === 'link' ? m.conteudo : '[Imagem]').join(', ')
-            })));
+        exportarExcel() {
+            const worksheet = utils.json_to_sheet(
+                this.aulas.map(aula => ({
+                    Data: this.formatDate(aula.data),
+                    Título: aula.titulo,
+                    Conteúdo: aula.conteudo,
+                    Materiais: aula.materiais.length ? 'Com imagens' : 'Sem materiais'
+                }))
+            );
 
             const workbook = utils.book_new();
             utils.book_append_sheet(workbook, worksheet, 'Aulas');
-            writeFile(workbook, `${this.professor}-aulas.xlsx`);
+            writeFileXLSX(workbook, `${this.professor}_aulas.xlsx`);
+        },
+
+        handleImageUpload(event: Event) {
+        const input = event.target as HTMLInputElement;
+        if (input.files?.[0]) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (e.target?.result) {
+                    this.novaAula.materiais.push(e.target.result as string);
+                    this.imageAdded = true;
+                    setTimeout(() => this.imageAdded = false, 2000);
+                }
+            };
+            reader.readAsDataURL(input.files[0]);
         }
+        },
+
+        iniciarEdicao(index: number) {
+            this.edicaoIndex = index;
+            this.edicaoBuffer = { ...this.aulas[index] };
+        },
+
+        salvarEdicao(index: number) {
+            this.aulas.splice(index, 1, this.edicaoBuffer);
+            this.cancelarEdicao();
+        },
+
+        cancelarEdicao() {
+            this.edicaoIndex = -1;
+            this.edicaoBuffer = {} as Aula;
+        },
+
+        formatDatePreview(date: Date) {
+            return date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' });
+        },
+
     }
 });
 </script>
-
 <style>
+.custom-datepicker {
+    @apply bg-white rounded-lg shadow-lg border border-gray-200;
+}
 
-.max-w-\[200px\] {
-    max-width: 200px;
+.custom-datepicker .dp__main {
+    @apply bg-white rounded-lg shadow-lg border border-gray-200;
+}
+
+.custom-datepicker .dp__calendar {
+    @apply text-gray-800;
+}
+
+.custom-datepicker .dp__cell_inner {
+    @apply hover:bg-blue-100 rounded-lg;
+}
+
+.custom-datepicker .dp__active_date {
+    @apply bg-blue-500 text-white font-bold;
+}
+
+.custom-datepicker .dp__today {
+    @apply border border-blue-500;
 }
 </style>
